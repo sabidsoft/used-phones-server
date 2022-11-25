@@ -33,6 +33,7 @@ const veryfyJWT = (req, res, next) => {
 const run = async () => {
     try {
         const brandsCollection = client.db('usedPhones').collection('brands')
+        const phonesCollection = client.db('usedPhones').collection('phones')
 
         // generate jwt
         app.get('/jwt', async (req, res) => {
@@ -59,6 +60,13 @@ const run = async () => {
             const query = { _id: ObjectId(id) }
             const brand = await brandsCollection.findOne(query)
             res.send(brand)
+        })
+
+        app.get('/phones', async(req, res) => {
+            const brand = req.query.brand
+            const query = { brand: brand }
+            const phones = await phonesCollection.find(query).toArray()
+            res.send(phones)
         })
     }
     finally { }
