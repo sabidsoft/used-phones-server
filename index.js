@@ -2,6 +2,7 @@
 require('dotenv').config()
 const express = require('express')
 const cors = require('cors')
+const jwt = require('jsonwebtoken')
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb')
 
 // declaring variables
@@ -34,6 +35,7 @@ const run = async () => {
     try {
         const brandsCollection = client.db('usedPhones').collection('brands')
         const phonesCollection = client.db('usedPhones').collection('phones')
+        const usersCollection = client.db('usedPhones').collection('users')
 
         // generate jwt
         app.get('/jwt', async (req, res) => {
@@ -67,6 +69,19 @@ const run = async () => {
             const query = { brand: brand }
             const phones = await phonesCollection.find(query).toArray()
             res.send(phones)
+        })
+
+        app.post('/users', async (req, res) => {
+            const users = req.body
+
+            const query = { email: users.email }
+            const user = await usersCollection.findOne(query)
+            if(user){
+                return res.send({ success: true, message: 'Old user!' })
+            }
+
+            const result = await usersCollection.insertOne(users)
+            res.send(result)
         })
     }
     finally { }
