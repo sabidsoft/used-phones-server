@@ -90,6 +90,19 @@ const run = async () => {
             const result = await bookingsCollection.insertOne(booking)
             res.send(result)
         })
+
+        app.get('/bookings', veryfyJWT, async (req, res) => {
+            const email = req.query.email
+            const decodedEmail = req.decoded.email
+
+            if(email !== decodedEmail){
+                return res.status(403).send({ success: false, message: 'Forbidden access!' })
+            }
+
+            const query = { userEmail: email }
+            const bookings = await bookingsCollection.find(query).toArray()
+            res.send(bookings)
+        })
     }
     finally { }
 }
