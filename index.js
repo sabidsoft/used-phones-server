@@ -4,6 +4,7 @@ const express = require('express')
 const cors = require('cors')
 const jwt = require('jsonwebtoken')
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb')
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY)
 
 // declaring variables
 const app = express()
@@ -37,6 +38,7 @@ const run = async () => {
         const phonesCollection = client.db('usedPhones').collection('phones')
         const usersCollection = client.db('usedPhones').collection('users')
         const bookingsCollection = client.db('usedPhones').collection('bookings')
+        const paymentsCollection = client.db('usedPhones').collection('payments')
 
         // generate jwt
         app.get('/jwt', async (req, res) => {
@@ -50,6 +52,38 @@ const run = async () => {
             }
 
             res.status(403).send({ token: '' })
+        })
+
+        // Payment Intension
+        app.post('/create-payment-intent', async(req, res) => {
+            const booking = req.body
+            const resalePrice = booking.resalePrice
+            const amount = resalePrice * 100 // Doller to Cent
+
+            const paymentIntent = await stripe.paymentIntents.create({
+                currency: 'usd',
+                amount: amount,
+                'payment_method_types': ['card']
+            })
+            res.send({ clientSecret: paymentIntent.client_secret })
+        })
+
+        // store payment data
+        app.post('/payments', async(req, res) => {
+            const payment = req.body
+            const id = payment.bookingId
+            const transactionId = payment.transactionId
+            const query = { _id: ObjectId(id)}
+            const updateDoc = {
+                $set: {
+                    paid: true,
+                    transactionId: transactionId
+                }
+            }
+
+            await bookingsCollection.updateOne(query, updateDoc)
+            const result = await paymentsCollection.insertOne(payment)
+            res.send(result)
         })
 
         app.get('/brands', async (req, res) => {
@@ -95,7 +129,7 @@ const run = async () => {
             const email = req.query.email
             const decodedEmail = req.decoded.email
 
-            if(email !== decodedEmail){
+            if (email !== decodedEmail) {
                 return res.status(403).send({ success: false, message: 'Forbidden access!' })
             }
 
@@ -104,7 +138,7 @@ const run = async () => {
             res.send(bookings)
         })
 
-        app.get('/bookings/:id', async(req, res) => {
+        app.get('/bookings/:id', async (req, res) => {
             const id = req.params.id
             const query = { _id: ObjectId(id) }
             const booking = await bookingsCollection.findOne(query)
