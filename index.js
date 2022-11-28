@@ -54,6 +54,17 @@ const run = async () => {
             res.status(403).send({ token: '' })
         })
 
+        // veryfyAdmin middleware
+        const veryfyAdmin = async (req, res, next) => {
+            const decodedEmail = req.decoded.email
+            const query = { email: decodedEmail }
+            const user = await usersCollection.findOne(query)
+            if(user?.role !== 'admin'){
+                return res.status(403).send({ success: false, message: 'Forbidden access!' })
+            }
+            next()
+        }
+
         // Payment Intension
         app.post('/create-payment-intent', async(req, res) => {
             const booking = req.body
@@ -97,6 +108,12 @@ const run = async () => {
             const query = { _id: ObjectId(id) }
             const brand = await brandsCollection.findOne(query)
             res.send(brand)
+        })
+
+        app.post('/phones', veryfyJWT, async(req, res) => {
+            const phone = req.body
+            const result = await phonesCollection.insertOne(phone)
+            res.send(result)
         })
 
         app.get('/phones', async (req, res) => {
