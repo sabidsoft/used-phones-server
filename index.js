@@ -67,7 +67,7 @@ const run = async () => {
         }
 
         // Payment Intension
-        app.post('/create-payment-intent', async (req, res) => {
+        app.post('/create-payment-intent', veryfyJWT, async (req, res) => {
             const booking = req.body
             const resalePrice = booking.resalePrice
             const amount = resalePrice * 100 // Doller to Cent
@@ -81,7 +81,7 @@ const run = async () => {
         })
 
         // store payment data
-        app.post('/payments', async (req, res) => {
+        app.post('/payments', veryfyJWT, async (req, res) => {
             const payment = req.body
             const id = payment.bookingId
             const transactionId = payment.transactionId
@@ -96,6 +96,13 @@ const run = async () => {
             await bookingsCollection.updateOne(query, updateDoc)
             await paymentsCollection.insertOne(payment)
             res.send({ soldPhoneId: id })
+        })
+
+        app.get('/users/:email', async (req, res) => {
+            const email = req.params.email
+            const query = { email }
+            const user = await usersCollection.findOne(query)
+            res.send(user)
         })
 
         app.get('/brands', async (req, res) => {
@@ -219,6 +226,34 @@ const run = async () => {
                 },
             }
             const result = await advertisedItemsCollection.updateOne(query, updateDoc, options)
+            res.send(result)
+        })
+
+        app.get('/all-sellers', async (req, res) => {
+            const query = {}
+            const users = await usersCollection.find(query).toArray()
+            const allSellers = users.filter(user => user.user_type === 'Seller')
+            res.send(allSellers)
+        })
+
+        app.delete('/all-sellers/:id', veryfyJWT, async (req, res) => {
+            const id = req.params.id
+            const query = { _id: ObjectId(id) }
+            const result = await usersCollection.deleteOne(query)
+            res.send(result)
+        })
+
+        app.get('/all-buyers', async (req, res) => {
+            const query = {}
+            const users = await usersCollection.find(query).toArray()
+            const allBuyers = users.filter(user => user.user_type === 'Buyer')
+            res.send(allBuyers)
+        })
+
+        app.delete('/all-buyers/:id', veryfyJWT, async (req, res) => {
+            const id = req.params.id
+            const query = { _id: ObjectId(id) }
+            const result = await usersCollection.deleteOne(query)
             res.send(result)
         })
 
