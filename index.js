@@ -39,6 +39,7 @@ const run = async () => {
         const usersCollection = client.db('usedPhones').collection('users')
         const bookingsCollection = client.db('usedPhones').collection('bookings')
         const paymentsCollection = client.db('usedPhones').collection('payments')
+        const advertisedItemsCollection = client.db('usedPhones').collection('advertisedItems')
 
         // generate jwt
         app.get('/jwt', async (req, res) => {
@@ -59,14 +60,14 @@ const run = async () => {
             const decodedEmail = req.decoded.email
             const query = { email: decodedEmail }
             const user = await usersCollection.findOne(query)
-            if(user?.role !== 'admin'){
+            if (user?.role !== 'admin') {
                 return res.status(403).send({ success: false, message: 'Forbidden access!' })
             }
             next()
         }
 
         // Payment Intension
-        app.post('/create-payment-intent', async(req, res) => {
+        app.post('/create-payment-intent', async (req, res) => {
             const booking = req.body
             const resalePrice = booking.resalePrice
             const amount = resalePrice * 100 // Doller to Cent
@@ -80,11 +81,11 @@ const run = async () => {
         })
 
         // store payment data
-        app.post('/payments', async(req, res) => {
+        app.post('/payments', async (req, res) => {
             const payment = req.body
             const id = payment.bookingId
             const transactionId = payment.transactionId
-            const query = { _id: ObjectId(id)}
+            const query = { _id: ObjectId(id) }
             const updateDoc = {
                 $set: {
                     paid: true,
@@ -93,8 +94,8 @@ const run = async () => {
             }
 
             await bookingsCollection.updateOne(query, updateDoc)
-            const result = await paymentsCollection.insertOne(payment)
-            res.send(result)
+            await paymentsCollection.insertOne(payment)
+            res.send({ soldPhoneId: id })
         })
 
         app.get('/brands', async (req, res) => {
@@ -110,7 +111,7 @@ const run = async () => {
             res.send(brand)
         })
 
-        app.post('/phones', veryfyJWT, async(req, res) => {
+        app.post('/phones', veryfyJWT, async (req, res) => {
             const phone = req.body
             const result = await phonesCollection.insertOne(phone)
             res.send(result)
@@ -120,7 +121,40 @@ const run = async () => {
             const brand = req.query.brand
             const query = { brand: brand }
             const phones = await phonesCollection.find(query).toArray()
-            res.send(phones)
+            const availablePhones = phones.filter(phone => phone.sales_status !== 'Sold')
+            res.send(availablePhones)
+        })
+
+        app.patch('/phones', async (req, res) => {
+            const phoneId = req.query.phoneId
+            const query = { _id: ObjectId(phoneId) }
+            const options = { upsert: true }
+            const updateDoc = {
+                $set: {
+                    sales_status: 'Sold'
+                },
+            }
+            const result = await phonesCollection.updateOne(query, updateDoc, options)
+            res.send(result)
+        })
+
+        app.get('/my-products', async (req, res) => {
+            const email = req.query.email
+            const query = { seller_email: email }
+            const products = await phonesCollection.find(query).toArray()
+            res.send(products)
+        })
+
+        app.delete('/my-products/:id', veryfyJWT, async (req, res) => {
+            const id = req.params.id
+
+            const query = { _id: ObjectId(id) }
+            await phonesCollection.deleteOne(query)
+
+            const anotherQuery = { phoneId: id }
+            await advertisedItemsCollection.deleteOne(anotherQuery)
+
+            res.send({ success: true, message: 'Deleted successfully!' })
         })
 
         app.post('/users', async (req, res) => {
@@ -161,6 +195,33 @@ const run = async () => {
             const booking = await bookingsCollection.findOne(query)
             res.send(booking)
         })
+
+        app.post('/advertised-items', async (req, res) => {
+            const product = req.body
+            const result = await advertisedItemsCollection.insertOne(product)
+            res.send(result)
+        })
+
+        app.get('/advertised-items', async (req, res) => {
+            const query = {}
+            const products = await advertisedItemsCollection.find(query).toArray()
+            const availableProducts = products.filter(phone => phone.sales_status !== 'Sold')
+            res.send(availableProducts)
+        })
+
+        app.patch('/advertised-items', async (req, res) => {
+            const phoneId = req.query.phoneId
+            const query = { phoneId: phoneId }
+            const options = { upsert: true }
+            const updateDoc = {
+                $set: {
+                    sales_status: 'Sold'
+                },
+            }
+            const result = await advertisedItemsCollection.updateOne(query, updateDoc, options)
+            res.send(result)
+        })
+
     }
     finally { }
 }
